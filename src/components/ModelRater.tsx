@@ -9,6 +9,7 @@ const ModelRater = () => {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [rating, setRating] = useState<number | null>(null);
+  const [modelDetails, setModelDetails] = useState<any>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -78,6 +79,7 @@ const ModelRater = () => {
 
     setIsLoading(true);
     setRating(null);
+    setModelDetails(null);
 
     try {
       // Convert base64 string to blob
@@ -86,10 +88,10 @@ const ModelRater = () => {
       
       // Create FormData
       const formData = new FormData();
-      formData.append("picture", blob, "image.jpg");
+      formData.append("Picture", blob, "image.jpg");
       
-      // Send to your API endpoint
-      const response = await fetch("https://xbut-eryu-hhsg.f2.xano.io/api:TAf2tJRT/sendpicmodelrater", {
+      // Send to your API endpoint - corrected endpoint name with capital S
+      const response = await fetch("https://xbut-eryu-hhsg.f2.xano.io/api:TAf2tJRT/SendPicModelRater", {
         method: "POST",
         body: formData,
       });
@@ -99,13 +101,35 @@ const ModelRater = () => {
       }
 
       const data = await response.json();
+      console.log("API response:", data);
       
-      if (data && typeof data.rating === 'number') {
-        setRating(data.rating);
-        toast({
-          title: "Rating Received",
-          description: `Your model rating is: ${data.rating}/10`,
-        });
+      if (data && data.resp && data.resp.length > 0) {
+        // Try to extract JSON from the response
+        try {
+          // Parse the JSON string from the first item in resp array
+          const jsonMatch = data.resp[0].match(/```json\n([\s\S]*?)\n```/);
+          if (jsonMatch && jsonMatch[1]) {
+            const modelData = JSON.parse(jsonMatch[1]);
+            setModelDetails(modelData);
+            
+            // If there's an angelicness score, use that for rating
+            if (modelData.angelicness) {
+              const angelicRating = Math.round(modelData.angelicness / 10);
+              setRating(angelicRating);
+              toast({
+                title: "Rating Received",
+                description: `Your model rating is: ${angelicRating}/10`,
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Error parsing JSON from response:", error);
+          toast({
+            title: "Response Format Error",
+            description: "Received response but could not parse details",
+            variant: "destructive",
+          });
+        }
       } else {
         throw new Error("Invalid response format");
       }
@@ -124,6 +148,7 @@ const ModelRater = () => {
   const resetImage = () => {
     setCapturedImage(null);
     setRating(null);
+    setModelDetails(null);
   };
 
   return (
@@ -182,6 +207,16 @@ const ModelRater = () => {
                   <p className="text-center text-2xl font-bold">
                     Your Rating: {rating}/10
                   </p>
+                  {modelDetails && (
+                    <div className="mt-2 space-y-2">
+                      {modelDetails["model agency rate"] && (
+                        <p><span className="font-semibold">Agency Rate:</span> {modelDetails["model agency rate"]}</p>
+                      )}
+                      {modelDetails["look unique features"] && (
+                        <p><span className="font-semibold">Unique Features:</span> {modelDetails["look unique features"]}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
